@@ -40,7 +40,7 @@ struct mgos_dht {
   struct mgos_dht_stats stats;
 };
 
-IRAM static bool dht_wait(int pin, int lvl, uint32_t usecs) {
+IRAM static uint32_t dht_wait(int pin, int lvl, uint32_t usecs) {
   uint32_t t = 0;
   while (mgos_gpio_read(pin) != lvl) {
     if (t == usecs) {
@@ -50,10 +50,12 @@ IRAM static bool dht_wait(int pin, int lvl, uint32_t usecs) {
     mgos_usleep(1);
     t++;
   }
-  return t != 0;
+  return t;
 }
 
 IRAM static bool dht_read(struct mgos_dht *dht) {
+  uint32_t cycles[80];
+
   if (dht == NULL) return false;
   double start = mg_time();
   dht->stats.read++;
@@ -95,25 +97,31 @@ IRAM static bool dht_read(struct mgos_dht *dht) {
     return false;
   }
 
-  /* Wait a rising edge and sleep after that 50 us.
-     If a pin is in low state, then it was a pulse 26-28 us (0),
-     otherwise - ~ 70us (1) */
-  mgos_usleep(10);
-  for (int i = 0, j; i < 40; i++) {
-    if (!dht_wait(dht->pin, 1, 50)) {
-      mgos_ints_enable();
-      return false;
-    }
-    mgos_usleep(50);
-    j = i / 8;
-    dht->data[j] <<= 1;
-    if (mgos_gpio_read(dht->pin)) {
-      dht->data[j] |= 1;
-      mgos_usleep(50);
-    }
+  /* Record timings for 40 cycles (2 per cycle)
+     Sensor sends low for 50ms, then high for either ~30ms or ~70ms */
+  for (int i = 0; i < 80; i += 2) {
+    cycles[i] = dht_wait(dht->pin, 1, 500);
+    cycles[i+1] = dht_wait(dht->pin, 0, 500);
   }
+
   /* Exit critical section */
   mgos_ints_enable();
+
+  /* Decode cycle timings (~70ms == 1, ~30ms == 0) */
+  for (int i = 0, j; i < 40; i++) {
+    uint32_t usec_low = cycles[2*i];
+    uint32_t usec_high = cycles[2*i+1];
+
+    if (usec_low == 0 || usec_high == 0) {
+      return false;
+    }
+
+    j = i / 8;
+    dht->data[j] <<= 1;
+    if (usec_high > usec_low) {
+      dht->data[j] |= 1;
+    }
+  }
 
   if (dht->data[4] ==
       ((dht->data[0] + dht->data[1] + dht->data[2] + dht->data[3]) & 0xFF)) {
