@@ -73,7 +73,13 @@ IRAM static bool dht_read(struct mgos_dht *dht) {
      sensor could detect it */
   mgos_gpio_set_mode(dht->pin, MGOS_GPIO_MODE_OUTPUT);
   mgos_gpio_write(dht->pin, 0);
-  mgos_msleep(18);
+
+  /* ITEAD uses a much shorter initiation pulse */
+  if (dht->type == ITEAD_SI7021) {
+      mgos_usleep(500);
+  } else {
+      mgos_msleep(18);
+  }
 
   /* Enter critical section */
   mgos_ints_disable();
@@ -142,18 +148,14 @@ float mgos_dht_get_temp(struct mgos_dht *dht) {
   float res = NAN;
 
   if (dht_read(dht)) {
-    switch (dht->type) {
-      case DHT11:
+    if (dht->type == DHT11) {
         res = dht->data[2];
-        break;
-      case DHT22:
-      case DHT21:
+    } else {
         res = dht->data[2] & 0x7F;
         res *= 256;
         res += dht->data[3];
         res *= 0.1;
         if (dht->data[2] & 0x80) res *= -1;
-        break;
     }
   }
   return res;
@@ -163,17 +165,13 @@ float mgos_dht_get_humidity(struct mgos_dht *dht) {
   float res = NAN;
 
   if (dht_read(dht)) {
-    switch (dht->type) {
-      case DHT11:
+    if (dht->type == DHT11) {
         res = dht->data[0];
-        break;
-      case DHT22:
-      case DHT21:
+    } else {
         res = dht->data[0];
         res *= 256;
         res += dht->data[1];
         res *= 0.1;
-        break;
     }
   }
   return res;

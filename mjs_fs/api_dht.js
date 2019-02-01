@@ -13,6 +13,7 @@ let DHT = {
   AM2301: 21,
   DHT22: 22,
   AM2302: 22,
+  ITEAD_SI7021: 23,
 
   // **`DHT.create(pin, type)`**
   // Create a DHT object. `type` could be `DHT.DHT11`, `DHT.DHT21`,

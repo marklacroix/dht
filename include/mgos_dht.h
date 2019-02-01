@@ -32,7 +32,7 @@ extern "C" {
 #endif
 
 /* Supported sensor types */
-enum dht_type { DHT11 = 11, DHT21 = 21, AM2301 = 21, DHT22 = 22, AM2302 = 22 };
+enum dht_type { DHT11 = 11, DHT21 = 21, AM2301 = 21, DHT22 = 22, AM2302 = 22, ITEAD_SI7021 = 23 };
 
 struct mgos_dht;
 struct mgos_dht_stats {
